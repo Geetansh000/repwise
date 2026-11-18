@@ -1,6 +1,6 @@
 import { Link, router } from 'expo-router';
 import { ArrowRight, Bell, CalendarDays, ChevronRight, ClipboardList, Dumbbell, Flame, TrendingUp } from 'lucide-react-native';
-import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { WorkoutBarChart } from '../../components/Charts';
 import { WeeklyProgress, WorkoutSpotlight } from '../../components/DashboardVisuals';
 import { ScreenEntrance } from '../../components/ScreenEntrance';
@@ -25,6 +25,17 @@ export default function HomeScreen() {
   return (
     <ScreenEntrance>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <View style={styles.brandHeader}>
+        <Image
+          source={require('../../assets/repwise-logo.png')}
+          style={styles.brandLogo}
+          accessibilityLabel="RepWise logo"
+        />
+        <View style={styles.brandCopy}>
+          <Text style={styles.brandName}>RepWise</Text>
+          <Text style={styles.brandTagline}>Track Every Rep. Build Every Gain. 💪</Text>
+        </View>
+      </View>
       <View style={styles.topRow}>
         <View style={styles.profileWrap}>
           <View style={styles.avatarWrap}>
@@ -213,6 +224,33 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     padding: 20,
     paddingBottom: 32,
+  },
+  brandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 18,
+  },
+  brandLogo: {
+    width: 58,
+    height: 58,
+    borderRadius: 16,
+    backgroundColor: '#050505',
+  },
+  brandCopy: {
+    flex: 1,
+  },
+  brandName: {
+    color: '#F5F7F2',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 0.2,
+  },
+  brandTagline: {
+    color: '#F28A1A',
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 3,
   },
   topRow: {
     flexDirection: 'row',

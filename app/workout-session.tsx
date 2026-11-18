@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Check, ChevronDown, ChevronUp, CirclePlus, Minus, Play, Plus, Search, Sparkles, Trash2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { Alert, AppState, findNodeHandle, ImageBackground, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, UIManager, View } from 'react-native';
+import { Alert, AppState, findNodeHandle, ImageBackground, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ExerciseInfoButton } from '../components/ExerciseInfoButton';
 import { ScreenEntrance } from '../components/ScreenEntrance';
 import { exerciseLibrary, exerciseMatchesPrimaryFocus, getExerciseNameKey, getFocusGroupForMuscle, recommendedTemplates, type Exercise } from '../data/exercises';
@@ -36,8 +36,7 @@ export default function WorkoutSessionScreen() {
   const isFinishing = useRef(false);
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const focusedInputRef = useRef<number | null>(null);
-  const scrollOffsetRef = useRef(0);
-  const keyboardTopRef = useRef<number | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const availableExercises = useMemo(() => [...exerciseLibrary, ...customExercises], [customExercises]);
   const selectedMuscles = useMemo(
     () => new Set(typeof params.muscles === 'string' ? params.muscles.split(',').filter(Boolean) : []),
@@ -77,6 +76,7 @@ export default function WorkoutSessionScreen() {
   const [pendingSupersetExerciseId, setPendingSupersetExerciseId] = useState<string | null>(null);
   const [notificationAvailable, setNotificationAvailable] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
+  const [showDiscardConfirmation, setShowDiscardConfirmation] = useState(false);
   const initialExercise = typeof params.exercise === 'string'
     ? availableExercises.find((exercise) => exercise.id === params.exercise || exercise.name === params.exercise)
     : undefined;
@@ -167,31 +167,22 @@ export default function WorkoutSessionScreen() {
     };
   }, [activeWorkoutId, pauseActiveWorkoutDraft, resumeActiveWorkoutDraft]));
 
-  const scrollFocusedInputIntoView = useCallback((keyboardTop: number) => {
+  const scrollFocusedInputIntoView = useCallback(() => {
     const inputHandle = focusedInputRef.current;
     if (Platform.OS === 'web' || inputHandle === null) return;
 
     setTimeout(() => {
-      UIManager.measureInWindow(inputHandle, (_x, y, _width, height) => {
-        const hiddenAmount = y + height + 20 - keyboardTop;
-        if (hiddenAmount > 0) {
-          scrollRef.current?.scrollTo({
-            y: scrollOffsetRef.current + hiddenAmount,
-            animated: true,
-          });
-        }
-      });
-    }, 50);
+      scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(inputHandle, 100, true);
+    }, 100);
   }, []);
 
   useEffect(() => {
     const showSubscription = Keyboard.addListener('keyboardDidShow', (event) => {
-      const keyboardTop = event.endCoordinates.screenY;
-      keyboardTopRef.current = keyboardTop;
-      scrollFocusedInputIntoView(keyboardTop);
+      setKeyboardHeight(Platform.OS === 'android' ? event.endCoordinates.height : 0);
+      scrollFocusedInputIntoView();
     });
     const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
-      keyboardTopRef.current = null;
+      setKeyboardHeight(0);
     });
 
     return () => {
@@ -525,25 +516,19 @@ export default function WorkoutSessionScreen() {
   const discardWorkout = () => {
     if (!activeWorkoutDraft) return;
 
-    Alert.alert(
-      'Discard workout?',
-      'This will permanently remove the active workout and all its logged sets.',
-      [
-        { text: 'Keep workout', style: 'cancel' },
-        {
-          text: 'Discard',
-          style: 'destructive',
-          onPress: () => {
-            isFinishing.current = true;
-            clearActiveWorkoutDraft(activeWorkoutDraft.id);
-            void dismissWorkoutNotification().catch((error) => {
-              console.error('Unable to dismiss the active workout notification.', error);
-            });
-            router.replace('/(tabs)/workout');
-          },
-        },
-      ],
-    );
+    setShowDiscardConfirmation(true);
+  };
+
+  const confirmDiscardWorkout = () => {
+    if (!activeWorkoutDraft) return;
+
+    setShowDiscardConfirmation(false);
+    isFinishing.current = true;
+    clearActiveWorkoutDraft(activeWorkoutDraft.id);
+    void dismissWorkoutNotification().catch((error) => {
+      console.error('Unable to dismiss the active workout notification.', error);
+    });
+    router.replace('/(tabs)/workout');
   };
 
   const saveWorkout = () => {
@@ -587,14 +572,10 @@ export default function WorkoutSessionScreen() {
     <ScrollView
       ref={scrollRef}
       style={styles.screen}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: 40 + keyboardHeight }]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
-      onScroll={(event) => {
-        scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
-      }}
-      scrollEventThrottle={16}
     >
       <View style={styles.headerRow}>
         <Pressable onPress={() => router.back()} hitSlop={8}>
@@ -945,9 +926,7 @@ export default function WorkoutSessionScreen() {
                       style={styles.setTableInput}
                       onFocus={(event) => {
                         focusedInputRef.current = findNodeHandle(event.target) ?? null;
-                        if (keyboardTopRef.current !== null) {
-                          scrollFocusedInputIntoView(keyboardTopRef.current);
-                        }
+                        scrollFocusedInputIntoView();
                       }}
                     />
                   )
@@ -971,9 +950,7 @@ export default function WorkoutSessionScreen() {
                         style={styles.setTableInput}
                         onFocus={(event) => {
                           focusedInputRef.current = findNodeHandle(event.target) ?? null;
-                          if (keyboardTopRef.current !== null) {
-                            scrollFocusedInputIntoView(keyboardTopRef.current);
-                          }
+                          scrollFocusedInputIntoView();
                         }}
                       />
                       <Pressable
@@ -988,7 +965,9 @@ export default function WorkoutSessionScreen() {
                 )}
                 {exercise.muscle !== 'Cardio' && (
                   isViewingCompleted ? (
-                    <Text style={[styles.setValue, isViewingCompleted && styles.setValueCompact]}>{set.weight} kg</Text>
+                    <Text style={[styles.setValue, isViewingCompleted && styles.setValueCompact]}>
+                      {set.weight > 0 ? `${set.weight} kg` : '—'}
+                    </Text>
                   ) : (
                     <TextInput
                       accessibilityLabel={`Set ${setIndex + 1} weight in kilograms`}
@@ -999,9 +978,7 @@ export default function WorkoutSessionScreen() {
                       style={styles.setTableInput}
                       onFocus={(event) => {
                         focusedInputRef.current = findNodeHandle(event.target) ?? null;
-                        if (keyboardTopRef.current !== null) {
-                          scrollFocusedInputIntoView(keyboardTopRef.current);
-                        }
+                        scrollFocusedInputIntoView();
                       }}
                     />
                   )
@@ -1080,6 +1057,55 @@ export default function WorkoutSessionScreen() {
       </Pressable>
     </ScrollView>
     </KeyboardAvoidingView>
+    <Modal
+      visible={showDiscardConfirmation}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowDiscardConfirmation(false)}
+    >
+      <View style={styles.discardBackdrop}>
+        <View
+          accessibilityViewIsModal
+          style={styles.discardDialog}
+        >
+          <View style={styles.discardDialogTop}>
+            <View style={styles.discardIcon}>
+              <Trash2 size={21} color="#FF7777" />
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Keep workout"
+              onPress={() => setShowDiscardConfirmation(false)}
+              style={styles.discardCloseButton}
+            >
+              <X size={18} color="#A8B5C7" />
+            </Pressable>
+          </View>
+          <Text style={styles.discardEyebrow}>END SESSION</Text>
+          <Text style={styles.discardTitle}>Discard this workout?</Text>
+          <Text style={styles.discardDescription}>
+            Your session and all logged sets will be permanently removed. This can’t be undone.
+          </Text>
+          <View style={styles.discardActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setShowDiscardConfirmation(false)}
+              style={styles.keepWorkoutButton}
+            >
+              <Text style={styles.keepWorkoutButtonText}>Keep workout</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={confirmDiscardWorkout}
+              style={styles.confirmDiscardButton}
+            >
+              <Trash2 size={16} color="#FF8A8A" />
+              <Text style={styles.confirmDiscardButtonText}>Discard workout</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
     </ScreenEntrance>
   );
 }
@@ -1118,6 +1144,97 @@ const styles = StyleSheet.create({
   discardText: {
     color: '#FF9E9E',
     fontSize: 10,
+    fontWeight: '700',
+  },
+  discardBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 22,
+    backgroundColor: 'rgba(3, 7, 13, 0.78)',
+  },
+  discardDialog: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    padding: 22,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#344153',
+    backgroundColor: '#111A27',
+  },
+  discardDialogTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  discardIcon: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 119, 119, 0.28)',
+    backgroundColor: 'rgba(255, 119, 119, 0.1)',
+  },
+  discardCloseButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#202C3B',
+  },
+  discardEyebrow: {
+    color: '#FF8A8A',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  discardTitle: {
+    color: '#F5F7F2',
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '800',
+    marginTop: 7,
+  },
+  discardDescription: {
+    color: '#A8B5C7',
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 9,
+  },
+  discardActions: {
+    gap: 10,
+    marginTop: 24,
+  },
+  keepWorkoutButton: {
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 15,
+    backgroundColor: '#D3FF00',
+  },
+  keepWorkoutButtonText: {
+    color: '#090B09',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  confirmDiscardButton: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 119, 119, 0.3)',
+    backgroundColor: 'rgba(255, 119, 119, 0.08)',
+  },
+  confirmDiscardButtonText: {
+    color: '#FF8A8A',
+    fontSize: 13,
     fontWeight: '700',
   },
   heading: {

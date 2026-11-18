@@ -16,7 +16,7 @@ export async function registerWorkoutNotificationActions() {
       buttonTitle: 'Add reps + kg',
       textInput: {
         submitButtonTitle: 'Log set',
-        placeholder: 'Type reps, weight kg (e.g. 8, 60)',
+        placeholder: 'Sets: reps kg, reps kg (e.g. 15 22.5, 12 30)',
       },
       options: { opensAppToForeground: false },
     },
@@ -62,9 +62,9 @@ export async function updateWorkoutNotification(draft: ActiveWorkoutDraft) {
     ? `${completedSets}/${plannedSets} sets · ${nextExercise.name} · Set ${nextSetIndex}/${nextExercise.sets.length}. ${
         isCardio
           ? `Enter minutes (e.g. ${nextSet?.reps || 20}).`
-          : `Enter reps, kg (e.g. ${nextSet?.reps || 8}, ${nextSet?.weight || 0}).`
+          : `Enter reps and kg; commas separate sets (e.g. 15 22.5, 12 30).`
       }`
-    : `${completedSets} sets logged. All planned sets are done — open REPWISE to add more.`;
+    : `${completedSets} sets logged. All planned sets are done — open RepWise to add more.`;
 
   await Notifications.dismissNotificationAsync(WORKOUT_NOTIFICATION_ID);
   await Notifications.scheduleNotificationAsync({
@@ -91,23 +91,52 @@ export async function dismissWorkoutNotification() {
 export function parseNotificationSetInput(
   input: string,
   isCardio: boolean,
-): { reps: number; weight: number } | null {
+): { reps: number; weight: number }[] | null {
   if (isCardio) {
-    const match = input.trim().match(/^(\d+(?:\.\d+)?)\s*(?:min(?:utes?)?)?$/i);
-    if (!match) return null;
-    const minutes = Number(match[1]);
-    return Number.isFinite(minutes) && minutes > 0
-      ? { reps: minutes, weight: 0 }
+    const durations = input.trim().split(/\s*,\s*/);
+    if (durations.length === 0) return null;
+
+    const parsedDurations = durations.map((duration) => {
+      const match = duration.match(/^(\d+(?:\.\d+)?)\s*(?:min(?:utes?)?)?$/i);
+      if (!match) return null;
+      const minutes = Number(match[1]);
+      return Number.isFinite(minutes) && minutes > 0
+        ? { reps: minutes, weight: 0 }
+        : null;
+    });
+    if (parsedDurations.some((duration) => duration === null)) return null;
+    return parsedDurations.filter(
+      (duration): duration is { reps: number; weight: number } => duration !== null,
+    );
+  }
+
+  const legacyMatch = input.trim().match(
+    /^(\d+)\s*(?:reps?)?\s*[,x×]\s*(\d+(?:\.\d+)?)\s*(?:kg)?$/i,
+  );
+  if (legacyMatch) {
+    const reps = Number(legacyMatch[1]);
+    const weight = Number(legacyMatch[2]);
+    return Number.isSafeInteger(reps) && reps > 0 && Number.isFinite(weight) && weight >= 0
+      ? [{ reps, weight }]
       : null;
   }
 
-  const match = input.trim().match(
-    /^(\d+)\s*(?:reps?)?\s*[,x×]\s*(\d+(?:\.\d+)?)\s*(?:kg)?$/i,
-  );
-  if (!match) return null;
-  const reps = Number(match[1]);
-  const weight = Number(match[2]);
-  return Number.isSafeInteger(reps) && reps > 0 && Number.isFinite(weight) && weight >= 0
-    ? { reps, weight }
-    : null;
+  const sets = input.trim().split(/\s*,\s*/);
+  if (sets.length === 0) return null;
+
+  const parsedSets = sets.map((set) => {
+    const match = set.match(/^(\d+)\s+(?:reps?\s+)?(\d+(?:\.\d+)?)\s*(?:kg)?$/i);
+    if (match) {
+      const reps = Number(match[1]);
+      const weight = Number(match[2]);
+      return Number.isSafeInteger(reps) && reps > 0 && Number.isFinite(weight) && weight >= 0
+        ? { reps, weight }
+        : null;
+    }
+
+    return null;
+  });
+
+  if (parsedSets.some((set) => set === null)) return null;
+  return parsedSets.filter((set): set is { reps: number; weight: number } => set !== null);
 }

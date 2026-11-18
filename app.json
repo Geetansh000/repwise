@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "REPWISE",
+    "name": "RepWise",
     "slug": "repwise",
     "scheme": "repwise",
     "version": "1.0.0",
@@ -8,7 +8,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "backgroundColor": "#090B09"
+      "backgroundColor": "#050505"
     },
     "ios": {
       "supportsTablet": true,
@@ -18,15 +18,13 @@
       "package": "com.repwise.app",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#090B09",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#050505",
+        "foregroundImage": "./assets/repwise-adaptive-foreground.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png",
+      "favicon": "./assets/repwise-logo.png",
       "headers": {
         "Cross-Origin-Embedder-Policy": "require-corp",
         "Cross-Origin-Opener-Policy": "same-origin"

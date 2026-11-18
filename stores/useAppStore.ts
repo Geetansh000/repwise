@@ -318,11 +318,16 @@ export const useAppStore = create<AppState>()(
       version: 6,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (_state, error) => {
-        if (error) console.error('Unable to restore saved REPWISE data.', error);
+        if (error) console.error('Unable to restore saved RepWise data.', error);
       },
       merge: (persistedState, currentState) => {
-        const persisted = persistedState as Partial<AppState>;
-        const workouts = removeLegacyBenchPressHistory(persisted.workouts ?? currentState.workouts);
+        const persisted = isRecord(persistedState)
+          ? persistedState as Partial<AppState>
+          : {};
+        const persistedWorkouts = Array.isArray(persisted.workouts)
+          ? persisted.workouts
+          : currentState.workouts;
+        const workouts = removeLegacyBenchPressHistory(persistedWorkouts);
         saveWorkoutsToSqlite(workouts);
         return {
           ...currentState,
@@ -332,8 +337,10 @@ export const useAppStore = create<AppState>()(
         };
       },
       migrate: (persistedState, version) => {
-        const persisted = persistedState as Partial<AppState>;
-        const workouts = persisted.workouts ?? [];
+        const persisted = isRecord(persistedState)
+          ? persistedState as Partial<AppState>
+          : {};
+        const workouts = Array.isArray(persisted.workouts) ? persisted.workouts : [];
 
         return {
           ...persisted,

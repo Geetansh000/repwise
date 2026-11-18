@@ -140,7 +140,7 @@ export default function WorkoutHistoryScreen() {
                               {set.reps} {exercise.muscle === 'Cardio' ? 'min' : 'reps'}
                             </Text>
                             {exercise.muscle !== 'Cardio' && (
-                              <Text style={styles.setValue}>{set.weight} kg</Text>
+                              <Text style={styles.setValue}>{set.weight > 0 ? `${set.weight} kg` : '—'}</Text>
                             )}
                             <Text style={[styles.setStatus, set.completed ? styles.completed : styles.incomplete]}>
                               {set.completed ? 'Done' : 'Not done'}

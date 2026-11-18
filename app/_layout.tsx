@@ -78,23 +78,29 @@ export default function RootLayout() {
       const nextExercise = draft.exercises.find((exercise) => (
         exercise.sets.some((set) => !set.completed)
       )) ?? draft.exercises[0];
-      const parsed = userText && nextExercise
+      const parsedSets = userText && nextExercise
         ? parseNotificationSetInput(userText, nextExercise.muscle === 'Cardio')
         : null;
-      if (!parsed) {
+      if (!parsedSets) {
         Alert.alert(
           'Set not logged',
           nextExercise?.muscle === 'Cardio'
             ? 'Enter the duration in minutes, for example: 20'
-            : 'Enter reps and weight in kg, for example: 8, 60',
+            : 'For each set, enter reps and weight separated by a space. Separate sets with commas, for example: 15 22.5, 12 30.',
         );
         return;
       }
 
-      const logged = state.logSetFromNotification(activeWorkoutId, parsed.reps, parsed.weight);
-      if (!logged) {
-        Alert.alert('Set not logged', 'Add an exercise to your active workout first.');
-        return;
+      for (const set of parsedSets) {
+        const logged = useAppStore.getState().logSetFromNotification(
+          activeWorkoutId,
+          set.reps,
+          set.weight,
+        );
+        if (!logged) {
+          Alert.alert('Set not logged', 'Add an exercise to your active workout first.');
+          return;
+        }
       }
 
       const updatedDraft = useAppStore.getState().activeWorkoutDraft;
@@ -110,7 +116,7 @@ export default function RootLayout() {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       void handleResponse(response).catch((error) => {
         console.error('Unable to process workout notification response.', error);
-        Alert.alert('Workout update failed', 'Open REPWISE and log the set in your workout.');
+        Alert.alert('Workout update failed', 'Open RepWise and log the set in your workout.');
       });
     });
 
